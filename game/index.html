@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PARDON RUN — The Great Turkey Escape</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #2b1a2e; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="PARDON RUN: a turkey flees a Thanksgiving farmer across a farmyard at dusk. Press Space, W or click to jump, S or Down to duck, dodge ovens and carving knives, grab corn, and reach the Pardon Gate at 1200 metres."></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
