@@ -7,19 +7,37 @@ import { makeRng, pick } from './random.js';
 export const GOAL_M = 1200;
 export const GROUND_Y = 620;
 
-export function createWorld(seed) {
+// Difficulty modes. Running speed is identical in every mode (the exact
+// v1 formula in stepWorld); modes differ only in lives, farmer behaviour
+// and obstacle density. MEDIUM reproduces the original v1 tuning exactly.
+export const MODES = {
+  easy: { lives: 5, startGap: 56, hitGap: 10, gapRegen: 1.6, spawnMin: 36, spawnMax: 52 },
+  medium: { lives: 3, startGap: 46, hitGap: 17, gapRegen: 1.15, spawnMin: 30, spawnMax: 46 },
+  hard: { lives: 2, startGap: 36, hitGap: 24, gapRegen: 0.8, spawnMin: 24, spawnMax: 38 },
+};
+export const MODE_ORDER = ['easy', 'medium', 'hard'];
+
+export function modeParams(mode) {
+  return MODES[mode] || MODES.medium;
+}
+
+export function createWorld(seed, mode = 'medium') {
+  const chosen = MODES[mode] ? mode : 'medium';
+  const p = MODES[chosen];
   return {
     phase: 'title', // title | run | escaped | caught
     seed,
+    mode: chosen,
     rng: makeRng(seed),
     time: 0,
     dist: 0,
     score: 0,
     corn: 0,
-    lives: 3,
-    speed: 7.2, // metres per second, grows as the run goes on
+    lives: p.lives,
+    maxLives: p.lives,
+    speed: 7.2, // metres per second, grows as the run goes on (same in all modes)
     turkey: { y: 0, vy: 0, ducking: false, runPhase: 0, hurt: 0 },
-    farmerGap: 46, // metres behind the turkey; 0 means caught
+    farmerGap: p.startGap, // metres behind the turkey; 0 means caught
     farmerBob: 0,
     items: [], // {kind: oven|knife|corn, x (screen offset m), y, spin, taken}
     nextSpawn: 26,
@@ -30,7 +48,7 @@ export function createWorld(seed) {
 }
 
 export function startRun(w) {
-  const fresh = createWorld(w.seed);
+  const fresh = createWorld(w.seed, w.mode);
   Object.assign(w, fresh);
   w.phase = 'run';
 }
@@ -50,7 +68,8 @@ function spawnAhead(w) {
     for (let i = 0; i < n; i++) w.items.push({ kind: 'corn', x: ahead + i * 2.6, arc: i, taken: false });
   }
   const tight = Math.min(9, w.dist / 160);
-  w.nextSpawn = w.dist + pick(rng, 30 - tight, 46 - tight);
+  const mp = modeParams(w.mode);
+  w.nextSpawn = w.dist + pick(rng, mp.spawnMin - tight, mp.spawnMax - tight);
 }
 
 export function turkeyBox(w) {
@@ -63,6 +82,8 @@ export function stepWorld(w, dt, input) {
   const events = [];
   if (w.phase !== 'run') return events;
   w.time += dt;
+  const mp = modeParams(w.mode);
+  // Speed is deliberately identical in every mode: the exact v1 formula.
   w.speed = 7.2 + Math.min(5.2, w.dist / 210);
   w.dist += w.speed * dt;
   w.score = Math.floor(w.dist) + w.corn * 25;
@@ -87,7 +108,7 @@ export function stepWorld(w, dt, input) {
 
   // The farmer slowly loses ground while the turkey runs clean, and gains
   // it back over time so a lazy run still ends in a chase.
-  w.farmerGap = Math.min(60, w.farmerGap + dt * 1.15);
+  w.farmerGap = Math.min(60, w.farmerGap + dt * mp.gapRegen);
 
   if (w.dist >= w.nextSpawn) spawnAhead(w);
 
@@ -132,7 +153,7 @@ function hit(w, events, message) {
   if (w.turkey.hurt > 0) return;
   w.lives -= 1;
   w.turkey.hurt = 1.1;
-  w.farmerGap = Math.max(0, w.farmerGap - 17);
+  w.farmerGap = Math.max(0, w.farmerGap - modeParams(w.mode).hitGap);
   w.flash = message;
   w.flashT = 1.6;
   w.shake = 1;

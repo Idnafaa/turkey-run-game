@@ -1,9 +1,9 @@
 // main.js — PARDON RUN entry point: owns the canvas, the frame loop and
 // the phase changes (title -> run -> escaped/caught -> restart).
 
-import { createWorld, startRun, stepWorld } from './world.js';
+import { createWorld, startRun, stepWorld, MODES, MODE_ORDER } from './world.js';
 import { drawScene, VIEW_W, VIEW_H } from './render.js';
-import { drawHud, drawTitle, drawEnd } from './hud.js';
+import { drawHud, drawTitle, drawEnd, MODE_BUTTONS } from './hud.js';
 import { createInput } from './input.js';
 import { sfx } from './audio.js';
 import { readShotRequest, applyShotScene } from './shots.js';
@@ -31,10 +31,44 @@ function beginOrJump() {
   else startRun(world);
 }
 
-const held = createInput((action) => {
+// Last stage transform computed by frame(); used to map tap coordinates.
+let stageScale = 1, stageOffX = 0, stageOffY = 0;
+
+function setMode(mode) {
+  if (!MODES[mode]) return;
+  world.mode = mode;
+  // Keep the title preview in sync: gap and lives for the chosen mode.
+  // (Speed is the same v1 formula in every mode, so it is not touched.)
+  const p = MODES[mode];
+  if (world.phase === 'title') { world.farmerGap = p.startGap; world.lives = p.lives; world.maxLives = p.lives; }
+  sfx.corn();
+}
+
+function cycleMode(dir) {
+  const idx = MODE_ORDER.indexOf(world.mode);
+  const next = MODE_ORDER[(idx + dir + MODE_ORDER.length) % MODE_ORDER.length];
+  setMode(next);
+}
+
+function handleTap(data) {
+  sfx.unlock();
+  if (world.phase === 'title' && data && typeof data.clientX === 'number') {
+    const sx = (data.clientX - stageOffX) / stageScale;
+    const sy = (data.clientY - stageOffY) / stageScale;
+    const btn = MODE_BUTTONS.find((b) => sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h);
+    if (btn) { setMode(btn.mode); return; }
+  }
+  beginOrJump();
+}
+
+const held = createInput((action, data) => {
   if (shot) return;
-  if (action === 'jump' || action === 'confirm') beginOrJump();
-  if (action === 'restart' && world.phase !== 'run') startRun(world);
+  if (action === 'tap') handleTap(data);
+  else if (action === 'jump' || action === 'confirm') beginOrJump();
+  else if (action === 'restart' && world.phase !== 'run') startRun(world);
+  else if (action === 'mode' && world.phase === 'title') setMode(data && data.mode);
+  else if (action === 'modePrev' && world.phase === 'title') cycleMode(-1);
+  else if (action === 'modeNext' && world.phase === 'title') cycleMode(1);
 });
 
 if (shot) applyShotScene(world, shot.scene);
@@ -62,6 +96,7 @@ function frame(now) {
   const scale = Math.min(window.innerWidth / VIEW_W, window.innerHeight / VIEW_H);
   const offX = (window.innerWidth - VIEW_W * scale) / 2;
   const offY = (window.innerHeight - VIEW_H * scale) / 2;
+  stageScale = scale; stageOffX = offX; stageOffY = offY;
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * offX, dpr * offY);
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
   drawScene(ctx, world);

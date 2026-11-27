@@ -3,7 +3,7 @@
 // entry screenshots are stable: title, play, chase and end.
 
 export const SHOT_SCENES = {
-  title: { phase: 'title' },
+  title: { phase: 'title', mode: 'medium' },
   play: {
     phase: 'run', dist: 386, score: 461, corn: 3, lives: 3, farmerGap: 38,
     items: [
@@ -39,6 +39,7 @@ export function readShotRequest() {
 
 export function applyShotScene(w, scene) {
   w.phase = scene.phase;
+  if (scene.mode) w.mode = scene.mode;
   if (scene.dist !== undefined) w.dist = scene.dist;
   if (scene.score !== undefined) w.score = scene.score;
   if (scene.corn !== undefined) w.corn = scene.corn;
